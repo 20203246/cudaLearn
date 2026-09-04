@@ -1,6 +1,6 @@
 CUDA_ARCH = -arch=native
 
-main: main.cu native_cpu.cpp gemm_gpu.cu
+main: main.cu *.cu *.cpp *.h
 	nvcc $(CUDA_ARCH) $< -o $@
 clean:
 	rm main

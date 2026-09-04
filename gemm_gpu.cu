@@ -1,6 +1,6 @@
 #pragma once
 
-__global__ void gemmGpuLaunch(int M, int N, int K, 
+static __global__ void gemmGpuLaunch(int M, int N, int K, 
     const float *A,const float *B, float *C) {
     const uint x = blockIdx.x * blockDim.x + threadIdx.x;
     const uint y = blockIdx.y * blockDim.y + threadIdx.y;
