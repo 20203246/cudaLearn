@@ -3,6 +3,7 @@
 #include "gemm_gpu.cu"
 #include "gemm_advance.cu"
 #include "test_device.cu"
+#include "add_gpu.cu"
 
 using namespace std;
 
@@ -11,16 +12,22 @@ void displayDeviceInformation() {
     cudaGetDeviceProperties(&prop, 0);
     cout << "Wrap size: " << prop.warpSize << endl;
     cout << "max Thread Per Streaming Multiprocessor: " << prop.maxThreadsPerMultiProcessor << endl;
+    int minGridSize, blockSize;
+    cudaOccupancyMaxPotentialBlockSize(&minGridSize,&blockSize,gemmGpuLaunch,0,0);
+    cout << "minGridSize: " << minGridSize << " blockSize: " << blockSize << endl;
 }
 
 int main()
 {
     displayDeviceInformation();
-    int M = 3, N = 3, K = 3;
     SgemmNativeCpu sgemmNativeCpu;
     sgemmNativeCpu.test();
     SgemmNative sgemmNative;
     sgemmNative.test();
-    MGemmAdvance mGemmAdvance;
-    mGemmAdvance.test();
+    AddNative addNative;
+    addNative.test();
+    // MGemmAdvance mGemmAdvance;
+    // mGemmAdvance.test();
+    // MDevice mDevice;
+    // mDevice.test();
 }

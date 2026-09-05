@@ -48,9 +48,9 @@ public:
         cudaDeviceSynchronize();
         cudaMemcpy(hc.p, dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
         cout << "GemmAdvance:" << endl;
-        for(int i = 0; i < M * N; i++) {
-            cout << hc[i] << " ";
-        }
+        // for(int i = 0; i < M * N; i++) {
+        //     cout << hc[i] << " ";
+        // }
         cout << "\n===============\n";
         float *_free[] = {da, db, dc};
         for(int i = 0; i < sizeof(_free) / sizeof(float*); i++)

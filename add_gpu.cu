@@ -1,25 +1,31 @@
 #pragma once
 
-// GPU activities:   95.50%  2.6686ms         1  2.6686ms  2.6686ms  2.6686ms  gemmGpuLaunch(int, int, int, float const *, float const *, float*)
-static __global__ void gemmGpuLaunch(int M, int N, int K, 
-    const float *A,const float *B, float *C) {
+static __global__ void addGpuLaunch(int N, const float *A,const float *B, float *C) {
     const uint x = blockIdx.x * blockDim.x + threadIdx.x;
-    const uint y = blockIdx.y * blockDim.y + threadIdx.y;
-    // __syncthreads();
-    if (x < M && y < N) {
-        float tmp = 0;
-        for(int i = 0; i < K; i++) {
-            tmp += A[x * K + i] * B[i * N + y];
+    uint en = 256 * x + 256;
+    if (en > N) en = N;
+    __shared__ float sa[256], sb[256];
+    for(int i = 256 * x; i < en; i++) {
+        sa[i - 256 * x] = A[i];
+        sb[i - 256 * x] = B[i];
+    }
+    __syncthreads();
+    for(int i = 256 * x; i < en; i++){
+        for (int lp = 0; lp < 10; lp++){
+            float tmp = sa[i - 256 * x] + sb[i - 256 * x];
+            C[i] = tmp;
+            // C[i] = sa[i] + sb[i];
+            // C[i] = A[i] + B[i];
         }
-        C[x * N + y] = tmp;
     }
 }
 
-class SgemmNative: public MMatmul {
+class AddNative: public MMatmul {
 public:
     void test() override {
         int M = 300, N = 300, K = 300;
         Tensor<float> ha(M, K, 2), hb(K, N, 2), hc(M, N, 0);
+        ha.fill(2), hb.fill(2);
         float *da, *db, *dc;
         cudaMalloc(&da, M * K * sizeof(float));
         cudaMalloc(&db, K * N * sizeof(float));
@@ -28,13 +34,11 @@ public:
         cudaMemcpy(db, hb.p, K * N * sizeof(float), cudaMemcpyHostToDevice);
         cudaMemcpy(dc, hc.p, M * N * sizeof(float), cudaMemcpyHostToDevice);
 
-        dim3 blockSize(32, 32);
-        dim3 gridSize((M+31)/32,(N+31)/32);
-        for(int lp = 0; lp < 100; lp++)
-            gemmGpuLaunch<<<gridSize,blockSize>>>(M,N,K,da,db,dc);
+        for(int lp = 0; lp < 1000; lp++)
+            addGpuLaunch<<<2, N*M/256>>>(M*N,da,db,dc);
         cudaDeviceSynchronize();
         cudaMemcpy(hc.p, dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
-        cout << "SgemmNative:" << endl;
+        cout << "AddNative:" << endl;
         for(int i = 0; i < min(10, M * N); i++) {
             cout << hc[i] << " ";
         }

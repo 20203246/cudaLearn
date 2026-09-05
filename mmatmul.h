@@ -21,6 +21,12 @@ public:
         }
     }
 
+    void fill(T x=1) {
+        for(int i = 0; i < M * N; i++) {
+            p[i] = x;
+        }
+    }
+
     ~Tensor() {
         if(p != nullptr) {
             delete p;
