@@ -63,7 +63,7 @@ public:
     void test() override {
         int M = 300000;
         Tensor<float> ha(M, 1, 2);
-        constexpr int BUFFER_SIZE = 256;
+        constexpr int BUFFER_SIZE = 32;
         Tensor<float> hb((M+BUFFER_SIZE-1)/BUFFER_SIZE,1,0);
         ha.fill(2);
         float *da, *db;

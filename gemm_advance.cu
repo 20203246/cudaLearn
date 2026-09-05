@@ -90,7 +90,70 @@ __global__ void mOnedimThreadTileGemmLaunch(int M, int N, int K,
             C[row * N + tCol] = tmp[i];
         }
     }
+}
+/**
+ * TM = TN = 8
+ * BK * iteratorNum = N
+ */
+template<int BM, int BN, int BK, int TM, int TN>
+__global__ void mTwodimThreadTileGemmLaunch(int M, int N, int K,
+    const float* A, const float *B, float *C)
+{
+    const uint tRow = threadIdx.y;
+    const uint tCol = threadIdx.x;
+    const uint cRow = blockIdx.y;
+    const uint cCol = blockIdx.x;
 
+    A += K * cRow * BM;
+    B += cCol * BN;
+    C += N * cRow * BM + cCol * BN;
+
+    if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0) {
+        printf("=== Debug Info ===\n");
+        printf("M=%d, N=%d, K=%d\n", M, N, K);
+        printf("BM=%d, BN=%d, BK=%d, TM=%d, TN=%d\n", BM, BN, BK, TM, TN);
+        printf("cRow=%d, cCol=%d\n", cRow, cCol);
+        printf("A offset=%d, B offset=%d, C offset=%d\n", 
+               cRow * BM * K, cCol * BN, cRow * BM * N + cCol * BN);
+    }
+    __shared__ float sa[BM][BK], sb[BK][BN];
+    float tmp[TM][TN] = {0};
+    for(int i = 0; i < K; i += BK) {
+        // CopyIn 
+        if (tRow < BM && tCol < BK) {
+            sa[tRow][tCol] = A[tRow * K + tCol];
+        }
+        if (tRow < BK && tCol < BN) {
+            sb[tRow][tCol] = B[tRow * N + tCol];
+        }
+        __syncthreads();
+        // Compute
+        for (int x = 0; x < TM; x++) {
+            for (int y = 0; y < TN; y++) {
+                for (int j = 0; j < BK; j++) {
+                    int row = tRow * TM + x;
+                    int col = tCol * TN + y;
+                    if (row < BM && col < BN) {
+                        tmp[x][y] += sa[row][j] * sb[j][col];
+                    }
+                }
+            }
+        }
+        __syncthreads();
+
+        A += BK;
+        B += N * BK;
+    }
+    //CopyOut
+    for (int x = 0; x < TM; x++) {
+        for (int y = 0; y < TN; y++) {
+            int row = cRow * BM + tRow * TM + x;
+            int col = cCol * BN + tCol * TN + y;
+            if (row < M && col < N) {
+                C[row * N + col] = tmp[x][y];
+            }
+        }
+    }
 }
 
 class MGemmAdvance : public MMatmul {
@@ -110,7 +173,10 @@ public:
         dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE);
         dim3 gridSize((N+BLOCK_SIZE-1)/BLOCK_SIZE,(M+BLOCK_SIZE-1)/BLOCK_SIZE);
         // mGemmAdvanceLaunch<<<gridSize,blockSize>>>(M,N,K,da,db,dc);
-        mOnedimThreadTileGemmLaunch<32,32,8,4><<<gridSize, blockSize>>>(M,N,K,da,db,dc);
+        // mOnedimThreadTileGemmLaunch<32,32,8,4><<<gridSize, blockSize>>>(M,N,K,da,db,dc);
+        mTwodimThreadTileGemmLaunch<32,32,8,4,4><<<
+            dim3(N/32,M/32),dim3(32/4,32/4)
+        >>>(M,N,K,da,db,dc);
         cudaDeviceSynchronize();
         cudaMemcpy(hc.p.get(), dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
         cout << "GemmAdvance:" << endl;

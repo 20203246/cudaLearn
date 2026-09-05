@@ -87,7 +87,7 @@ public:
 
     friend ostream& operator << (ostream&out, const Tensor<T>& t) {
         int _END = min(t.N, t.M);
-        _END = min(_END, 10);
+        _END = min(_END, 50);
         cout << "M=" << t.M << " " << "N=" << t.N << endl;
         T* data = t.p.get();
         assert(data != nullptr);
