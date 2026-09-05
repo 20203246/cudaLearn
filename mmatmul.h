@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <memory>
+#include <cstring>
 using namespace std;
 
 template<typename T>
@@ -11,7 +12,7 @@ public:
     shared_ptr<T[]> p;
     int M = -1, N = -1;
     Tensor() = delete;
-    Tensor(int M, int N, T defValue=0): M(M), N(N) {
+    Tensor(int M, int N, int defValue=0): M(M), N(N) {
         p = shared_ptr<T[]>(new T[M*N]);
         ones(defValue);
     }
@@ -25,7 +26,6 @@ public:
         cout << "copy constructor" << endl;
     }
     void ones(T x = 1) {
-        assert(M == N);
         for(int i = 0; i < M; i++) {
             for(int j = 0; j < N; j++) {
                 p.get()[i * N + j] = (i == j ? x : 0);
@@ -85,7 +85,7 @@ public:
         return true;
     }
 
-    friend ostream& operator << (ostream&out, const Tensor& t) {
+    friend ostream& operator << (ostream&out, const Tensor<T>& t) {
         int _END = min(t.N, t.M);
         _END = min(_END, 10);
         cout << "M=" << t.M << " " << "N=" << t.N << endl;
@@ -105,4 +105,7 @@ class MMatmul {
 public:
     virtual void launch(float *A, float *B, float *C, int M, int N, int K) { };
     virtual void test() { }
+    string do_test(bool flag) {
+        return flag ? "pass" : "fail";
+    }
 };

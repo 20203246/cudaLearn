@@ -117,7 +117,7 @@ public:
         cout << hc << endl;
         Tensor<float> truth(M, N);
         truth.fill(9);
-        cout << "======= test:" << (hc == truth) << "========\n";
+        cout << "======= test:" << do_test(hc == truth) << "========\n";
         float *_free[] = {da, db, dc};
         for(int i = 0; i < sizeof(_free) / sizeof(float*); i++)
             cudaFree(_free[i]);

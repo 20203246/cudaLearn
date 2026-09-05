@@ -4,6 +4,7 @@
 #include "gemm_advance.cu"
 #include "test_device.cu"
 #include "add_gpu.cu"
+#include "reduce.cu"
 
 using namespace std;
 
@@ -30,4 +31,6 @@ int main()
     mGemmAdvance.test();
     // MDevice mDevice;
     // mDevice.test();
+    ReduceKernel reduceKernel;
+    reduceKernel.test();
 }
