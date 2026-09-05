@@ -26,8 +26,8 @@ int main()
     sgemmNative.test();
     AddNative addNative;
     addNative.test();
-    // MGemmAdvance mGemmAdvance;
-    // mGemmAdvance.test();
+    MGemmAdvance mGemmAdvance;
+    mGemmAdvance.test();
     // MDevice mDevice;
     // mDevice.test();
 }

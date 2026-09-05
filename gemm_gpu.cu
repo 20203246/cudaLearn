@@ -1,6 +1,5 @@
 #pragma once
 
-// GPU activities:   95.50%  2.6686ms         1  2.6686ms  2.6686ms  2.6686ms  gemmGpuLaunch(int, int, int, float const *, float const *, float*)
 static __global__ void gemmGpuLaunch(int M, int N, int K, 
     const float *A,const float *B, float *C) {
     const uint x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -24,16 +23,16 @@ public:
         cudaMalloc(&da, M * K * sizeof(float));
         cudaMalloc(&db, K * N * sizeof(float));
         cudaMalloc(&dc, M * N * sizeof(float));
-        cudaMemcpy(da, ha.p, M * K * sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(db, hb.p, K * N * sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(dc, hc.p, M * N * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(da, ha.p.get(), M * K * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(db, hb.p.get(), K * N * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(dc, hc.p.get(), M * N * sizeof(float), cudaMemcpyHostToDevice);
 
         dim3 blockSize(32, 32);
         dim3 gridSize((M+31)/32,(N+31)/32);
         for(int lp = 0; lp < 100; lp++)
             gemmGpuLaunch<<<gridSize,blockSize>>>(M,N,K,da,db,dc);
         cudaDeviceSynchronize();
-        cudaMemcpy(hc.p, dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(hc.p.get(), dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
         cout << "SgemmNative:" << endl;
         for(int i = 0; i < min(10, M * N); i++) {
             cout << hc[i] << " ";

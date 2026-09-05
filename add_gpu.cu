@@ -30,14 +30,14 @@ public:
         cudaMalloc(&da, M * K * sizeof(float));
         cudaMalloc(&db, K * N * sizeof(float));
         cudaMalloc(&dc, M * N * sizeof(float));
-        cudaMemcpy(da, ha.p, M * K * sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(db, hb.p, K * N * sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(dc, hc.p, M * N * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(da, ha.p.get(), M * K * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(db, hb.p.get(), K * N * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(dc, hc.p.get(), M * N * sizeof(float), cudaMemcpyHostToDevice);
 
         for(int lp = 0; lp < 1000; lp++)
             addGpuLaunch<<<2, N*M/256>>>(M*N,da,db,dc);
         cudaDeviceSynchronize();
-        cudaMemcpy(hc.p, dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(hc.p.get(), dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
         cout << "AddNative:" << endl;
         for(int i = 0; i < min(10, M * N); i++) {
             cout << hc[i] << " ";

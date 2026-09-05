@@ -16,42 +16,61 @@
  * row7 │ T8   T9   T10  T11  T12  T13  T14  T15         │
  *      └────────────────────────────────────────────────┘
  */
-template<const int BM, const int BN, const int BK, const int TM>
+static constexpr int BLOCK_SIZE = 32;
 __global__ void mGemmAdvanceLaunch(int M, int N, int K, 
     const float *A,const float *B, float *C) {
 
-    const uint c_row = blockIdx.y;
-    const uint c_col = blockIdx.x;
-    __shared__ float A_shared[BM * BK], B_shared[BK * BN];
-    const uint thread_row = threadIdx.x / BN;
-    const uint thread_col = threadIdx.x % BN;
+    const uint cRow = blockIdx.y;
+    const uint cCol = blockIdx.x;
 
+    A += cRow * K * BLOCK_SIZE;
+    B += cCol * BLOCK_SIZE;
+    C += (cRow * N + cCol) * BLOCK_SIZE;
+    float tmp = 0;
+    __shared__ float sa[BLOCK_SIZE][BLOCK_SIZE], sb[BLOCK_SIZE][BLOCK_SIZE];
+    for(int i = 0; i < K; i += BLOCK_SIZE) {
+        sa[threadIdx.y][threadIdx.x] = A[threadIdx.y * K + threadIdx.x];
+        sb[threadIdx.y][threadIdx.x] = B[threadIdx.y * N + threadIdx.x];
+        
+        __syncthreads();
+
+        for(int j = 0; j < BLOCK_SIZE; j++) {
+            tmp += sa[threadIdx.y][j] * sb[j][threadIdx.x];
+        }
+
+        __syncthreads();
+
+        A += BLOCK_SIZE;
+        B += BLOCK_SIZE * N;
+    }
+    C[threadIdx.y * N + threadIdx.x] = tmp;
 
 }
 
 class MGemmAdvance : public MMatmul {
 public:
     void test() {
-        int M = 64, N = 64, K = 64;
+        int M = 128, N = 128, K = 128;
         Tensor<float> ha(M, K, 3), hb(K, N, 3), hc(M, N, 0);
+        ha.fill(3);
         float *da, *db, *dc;
         cudaMalloc(&da, M * K * sizeof(float));
         cudaMalloc(&db, K * N * sizeof(float));
         cudaMalloc(&dc, M * N * sizeof(float));
-        cudaMemcpy(da, ha.p, M * K * sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(db, hb.p, K * N * sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(dc, hc.p, M * N * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(da, ha.p.get(), M * K * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(db, hb.p.get(), K * N * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(dc, hc.p.get(), M * N * sizeof(float), cudaMemcpyHostToDevice);
 
-        dim3 blockSize(32, 32);
-        dim3 gridSize((M+31)/32,(N+31)/32);
-        // mGemmAdvanceLaunch<<<gridSize,blockSize>>>(M,N,K,da,db,dc);
+        dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE);
+        dim3 gridSize((M+BLOCK_SIZE-1)/BLOCK_SIZE,(N+BLOCK_SIZE-1)/BLOCK_SIZE);
+        mGemmAdvanceLaunch<<<gridSize,blockSize>>>(M,N,K,da,db,dc);
         cudaDeviceSynchronize();
-        cudaMemcpy(hc.p, dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(hc.p.get(), dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
         cout << "GemmAdvance:" << endl;
-        // for(int i = 0; i < M * N; i++) {
-        //     cout << hc[i] << " ";
-        // }
-        cout << "\n===============\n";
+        cout << hc << endl;
+        Tensor<float> truth(M, N);
+        truth.fill(3);
+        cout << "======= test:" << (hc == truth) << "========\n";
         float *_free[] = {da, db, dc};
         for(int i = 0; i < sizeof(_free) / sizeof(float*); i++)
             cudaFree(_free[i]);

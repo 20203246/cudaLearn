@@ -1,46 +1,103 @@
 #pragma once
 #include <cassert>
 #include <vector>
+#include <iostream>
+#include <memory>
+using namespace std;
+
 template<typename T>
 class Tensor {
-// 易发生释放以释放的指针
 public:
-    T *p = nullptr;
+    shared_ptr<T[]> p;
     int M = -1, N = -1;
     Tensor() = delete;
     Tensor(int M, int N, T defValue=0): M(M), N(N) {
-        p = new T[M * N];
+        p = shared_ptr<T[]>(new T[M*N]);
         ones(defValue);
+    }
+    Tensor(const Tensor& t) {
+        M = t.M;
+        N = t.N;
+        p = shared_ptr<T[]>(new T[M*N]);
+        for (int i = 0; i < M * N; i++) {
+            p[i] = t.p[i];
+        }
+        cout << "copy constructor" << endl;
     }
     void ones(T x = 1) {
         assert(M == N);
         for(int i = 0; i < M; i++) {
             for(int j = 0; j < N; j++) {
-                p[i * N + j] = (i == j ? x : 0);
+                p.get()[i * N + j] = (i == j ? x : 0);
             }
         }
     }
 
     void fill(T x=1) {
         for(int i = 0; i < M * N; i++) {
-            p[i] = x;
+            p.get()[i] = x;
         }
     }
-
-    ~Tensor() {
-        if(p != nullptr) {
-            delete p;
-            p = nullptr;
+    void upper(T x=1){
+        assert(M == N);
+        for(int i = 0; i < M; i++) {
+            for(int j = i; j < N; j++) {
+                p[i * N + j] = x;
+            }
         }
     }
     T operator[] (int idx) const {
         assert(idx >= 0 && idx < M * N);
-        return p[idx];
+        return p.get()[idx];
     }
     void operator *= (const int scale) {
         for(int i = 0; i < M * N; i++) {
-            p[i] *= scale;
+            p.get()[i] *= scale;
         }
+    }
+
+    Tensor operator * (const Tensor &other) {
+        assert(N == other.M);
+        Tensor tmp(M, other.N, 0);
+        for(int i = 0; i < M; i++) {
+            for(int j = 0; j < other.N; j++) {
+                for (int k = 0; k < N; k++) {
+                    tmp.p[i * other.N + j] = p[i * N + k] * other.p[k * other.N + j];
+                }
+            }
+        }
+        return tmp;
+    }
+
+    template<typename H>
+    bool operator == (const Tensor<H> &other) const {
+        if (!std::is_same_v<T, H>) {
+            return false;
+        }
+        if (M != other.M || N != other.N) return false;
+        for (int i = 0; i < M; i++) {
+            for (int j = 0; j < N; j++) {
+                if (p.get()[i * N + j] != other.p.get()[i * N + j]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    friend ostream& operator << (ostream&out, const Tensor& t) {
+        int _END = min(t.N, t.M);
+        _END = min(_END, 10);
+        cout << "M=" << t.M << " " << "N=" << t.N << endl;
+        T* data = t.p.get();
+        assert(data != nullptr);
+        for(int i = 0; i < _END; i++) {
+            cout << "i: " << i << "| ";
+            for(int j = 0; j < _END; j++) {
+                out << data[i * t.N + j] << " \n"[j == _END - 1];
+            }
+        }
+        return out;
     }
 };
 
