@@ -3,7 +3,7 @@
 
 
 template<int BUFFER_SIZE>
-__global__ void reduceGpuLaunch(int N, float *A, float *out) {
+__global__ void reduceGpuBaselineLaunch(int N, float *A, float *out) {
     __shared__ float sdata[BUFFER_SIZE];
     int tid = threadIdx.x;
     int bid = blockIdx.x;
@@ -24,6 +24,24 @@ __global__ void reduceGpuLaunch(int N, float *A, float *out) {
     }
 }
 
+template<int BUFFER_SIZE>
+__global__ void reduceGpuInterleavedLaunch(int N, float *A, float *out) {
+    __shared__ float sa[BUFFER_SIZE];
+    const uint idx = blockDim.x * blockIdx.x + threadIdx.x;
+    if (idx < N) sa[threadIdx.x] = A[idx];
+    else sa[threadIdx.x] = 0;
+    __syncthreads();
+    // 0 ... threadDim.x-1
+    for(int h = 1; h < blockDim.x; h <<= 1) {
+        int from = 2 * h * threadIdx.x;
+        if ((from + h < blockDim.x) && (idx + h <= N)) {
+            sa[from] += sa[from + h];
+        }
+        __syncthreads();
+    }
+    out[blockIdx.x] = sa[0];
+}
+
 class ReduceKernel: public MMatmul {
 public:
     void test() override {
@@ -36,11 +54,13 @@ public:
         cudaMalloc(&da, M * sizeof(float));
         cudaMalloc(&db, hb.M * sizeof(float));
         cudaMemcpy(da, ha.p.get(), M * sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(db, hb.p.get(), sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(db, hb.p.get(), hb.M * sizeof(float), cudaMemcpyHostToDevice);
         dim3 gridSize((M+BUFFER_SIZE-1)/BUFFER_SIZE);
         dim3 blockSize(BUFFER_SIZE);
-        // for(int lp = 0; lp < 100; lp++)
-            reduceGpuLaunch<BUFFER_SIZE><<<gridSize,blockSize>>>(M,da,db);
+        for(int lp = 0; lp < 1; lp++){
+            // reduceGpuBaselineLaunch<BUFFER_SIZE><<<gridSize,blockSize>>>(M,da,db);
+            reduceGpuInterleavedLaunch<BUFFER_SIZE><<<gridSize,blockSize>>>(M,da,db);
+        }
         cudaDeviceSynchronize();
         cudaMemcpy(ha.p.get(), da, M * sizeof(float), cudaMemcpyDeviceToHost);
         cudaMemcpy(hb.p.get(), db, hb.M * sizeof(float), cudaMemcpyDeviceToHost);
