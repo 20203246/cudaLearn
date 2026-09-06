@@ -139,8 +139,11 @@ __global__ void mTwodimThreadTileGemmLaunch(int M, int N, int K,
         //     DEBUG<float>(&sb[0][0], BK, BN, "from RIGHT");
         // }
         // Compute
+        #pragma unroll
         for (int x = 0; x < TM; x++) {
+            #pragma unroll
             for (int y = 0; y < TN; y++) {
+                #pragma unroll
                 for (int j = 0; j < BK; j++) {
                     int row = tRow * TM + x;
                     int col = tCol * TN + y;
@@ -165,7 +168,9 @@ __global__ void mTwodimThreadTileGemmLaunch(int M, int N, int K,
         B += N * BK;
     }
     //CopyOut
+    #pragma unroll
     for (int x = 0; x < TM; x++) {
+        #pragma unroll
         for (int y = 0; y < TN; y++) {
             int row = tRow * TM + x;
             int col = tCol * TN + y;
@@ -183,8 +188,6 @@ public:
         Tensor<float> ha(M, K, 3), hb(K, N, 3), hc(M, N, 0);
         ha.fill(3);
         hb.fill(1);
-        cout << "hb[64][0] = " << hb.p[64 * N + 0] << endl;
-        cout << "hb[64][64] = " << hb.p[64 * N + 64] << endl;
         // ha.arange(0, M*K);
         float *da, *db, *dc;
         cudaMalloc(&da, M * K * sizeof(float));
@@ -196,11 +199,11 @@ public:
 
         dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE);
         dim3 gridSize((N+BLOCK_SIZE-1)/BLOCK_SIZE,(M+BLOCK_SIZE-1)/BLOCK_SIZE);
-        // mGemmAdvanceLaunch<<<gridSize,blockSize>>>(M,N,K,da,db,dc);
-        // mOnedimThreadTileGemmLaunch<32,32,8,4><<<gridSize, blockSize>>>(M,N,K,da,db,dc);
-        mTwodimThreadTileGemmLaunch<32,32,8,4,4><<<
-            dim3(N/32,M/32),dim3(32/4,32/4)
-        >>>(M,N,K,da,db,dc);
+        for(int _ = 0; _ < 100; _++){
+            mGemmAdvanceLaunch<<<gridSize,blockSize>>>(M,N,K,da,db,dc);
+            mOnedimThreadTileGemmLaunch<32,32,8,4><<<gridSize, blockSize>>>(M,N,K,da,db,dc);
+            mTwodimThreadTileGemmLaunch<32,32,8,2,2><<<dim3(N/32,M/32),dim3(32/2,32/2) >>>(M,N,K,da,db,dc);
+        }
         cudaDeviceSynchronize();
         cudaMemcpy(hc.p.get(), dc, M * N * sizeof(float), cudaMemcpyDeviceToHost);
         cout << "GemmAdvance:" << endl;
