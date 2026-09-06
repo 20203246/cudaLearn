@@ -108,25 +108,36 @@ __global__ void mTwodimThreadTileGemmLaunch(int M, int N, int K,
     B += cCol * BN;
     C += N * cRow * BM + cCol * BN;
 
-    if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0) {
-        printf("=== Debug Info ===\n");
-        printf("M=%d, N=%d, K=%d\n", M, N, K);
-        printf("BM=%d, BN=%d, BK=%d, TM=%d, TN=%d\n", BM, BN, BK, TM, TN);
-        printf("cRow=%d, cCol=%d\n", cRow, cCol);
-        printf("A offset=%d, B offset=%d, C offset=%d\n", 
-               cRow * BM * K, cCol * BN, cRow * BM * N + cCol * BN);
-    }
+    // if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0) {
+    //     printf("=== Debug Info ===\n");
+    //     printf("M=%d, N=%d, K=%d\n", M, N, K);
+    //     printf("BM=%d, BN=%d, BK=%d, TM=%d, TN=%d\n", BM, BN, BK, TM, TN);
+    //     printf("cRow=%d, cCol=%d\n", cRow, cCol);
+    //     printf("A offset=%d, B offset=%d, C offset=%d\n", 
+    //            cRow * BM * K, cCol * BN, cRow * BM * N + cCol * BN);
+    // }
     __shared__ float sa[BM][BK], sb[BK][BN];
     float tmp[TM][TN] = {0};
     for(int i = 0; i < K; i += BK) {
         // CopyIn 
-        if (tRow < BM && tCol < BK) {
-            sa[tRow][tCol] = A[tRow * K + tCol];
+        for (int x = 0; x < TM; x++) {
+            int row = tRow * TM + x;
+            if (row < BM && tCol < BK) {
+                sa[row][tCol] = A[row * K + tCol];
+            }
         }
-        if (tRow < BK && tCol < BN) {
-            sb[tRow][tCol] = B[tRow * N + tCol];
+        for (int y = 0; y < TN; y++) {
+            int col = tCol * TN + y;
+            if (tRow < BK && col < BN) {
+                sb[tRow][col] = B[tRow * N + col];
+            }
         }
         __syncthreads();
+        // if (tCol == 0 && tRow == 0 && cCol == 1 && cRow == 0) {
+        //     printf("BM = %d, BK = %d, i = %d\n", BM, BK, i);
+        //     DEBUG<float>(&sa[0][0], BM, BK, "from LEFT");
+        //     DEBUG<float>(&sb[0][0], BK, BN, "from RIGHT");
+        // }
         // Compute
         for (int x = 0; x < TM; x++) {
             for (int y = 0; y < TN; y++) {
@@ -139,6 +150,15 @@ __global__ void mTwodimThreadTileGemmLaunch(int M, int N, int K,
                 }
             }
         }
+        // if (cRow == 0 && cCol == 1 && tRow == 0 && tCol == 0) {
+        //     printf("Generated Matrix");
+        //     for (int x = 0; x < TM; x++) {
+        //         for (int y = 0; y < TN; y++) {
+        //             printf("%.0f ", tmp[x][y]);
+        //         }
+        //         printf("\n");
+        //     }
+        // }
         __syncthreads();
 
         A += BK;
@@ -147,8 +167,8 @@ __global__ void mTwodimThreadTileGemmLaunch(int M, int N, int K,
     //CopyOut
     for (int x = 0; x < TM; x++) {
         for (int y = 0; y < TN; y++) {
-            int row = cRow * BM + tRow * TM + x;
-            int col = cCol * BN + tCol * TN + y;
+            int row = tRow * TM + x;
+            int col = tCol * TN + y;
             if (row < M && col < N) {
                 C[row * N + col] = tmp[x][y];
             }
@@ -162,6 +182,10 @@ public:
         int M = 128, N = 128, K = 128;
         Tensor<float> ha(M, K, 3), hb(K, N, 3), hc(M, N, 0);
         ha.fill(3);
+        hb.fill(1);
+        cout << "hb[64][0] = " << hb.p[64 * N + 0] << endl;
+        cout << "hb[64][64] = " << hb.p[64 * N + 64] << endl;
+        // ha.arange(0, M*K);
         float *da, *db, *dc;
         cudaMalloc(&da, M * K * sizeof(float));
         cudaMalloc(&db, K * N * sizeof(float));
@@ -182,7 +206,7 @@ public:
         cout << "GemmAdvance:" << endl;
         cout << hc << endl;
         Tensor<float> truth(M, N);
-        truth.fill(9);
+        truth.fill(384);
         cout << "======= test:" << do_test(hc == truth) << "========\n";
         float *_free[] = {da, db, dc};
         for(int i = 0; i < sizeof(_free) / sizeof(float*); i++)

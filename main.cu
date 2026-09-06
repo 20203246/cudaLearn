@@ -20,17 +20,17 @@ void displayDeviceInformation() {
 
 int main()
 {
-    displayDeviceInformation();
-    SgemmNativeCpu sgemmNativeCpu;
-    sgemmNativeCpu.test();
-    SgemmNative sgemmNative;
-    sgemmNative.test();
-    AddNative addNative;
-    addNative.test();
+    // displayDeviceInformation();
+    // SgemmNativeCpu sgemmNativeCpu;
+    // sgemmNativeCpu.test();
+    // SgemmNative sgemmNative;
+    // sgemmNative.test();
+    // AddNative addNative;
+    // addNative.test();
     MGemmAdvance mGemmAdvance;
     mGemmAdvance.test();
     // MDevice mDevice;
     // mDevice.test();
-    ReduceKernel reduceKernel;
-    reduceKernel.test();
+    // ReduceKernel reduceKernel;
+    // reduceKernel.test();
 }

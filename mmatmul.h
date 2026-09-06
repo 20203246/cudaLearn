@@ -7,6 +7,22 @@
 using namespace std;
 
 template<typename T>
+__device__ void DEBUG(T *ptr, int M, int N, const char *s) {
+    printf("%s\n", s);
+    for(int i = 0; i < M; i++) {
+        printf("i=%d | ", i);
+        for (int j = 0; j < N; j++) {
+            if constexpr (std::is_same_v<T, int>) {
+                printf("%d ", ptr[i * N + j]);
+            } else if constexpr (std::is_same_v<T, float>) {
+                printf("%.0f ", ptr[i * N + j]);
+            }
+        }
+        printf("\n");
+    }
+}
+
+template<typename T>
 class Tensor {
 public:
     shared_ptr<T[]> p;
@@ -38,6 +54,13 @@ public:
             p.get()[i] = x;
         }
     }
+
+    void arange(T from, T to) {
+        for(int i = 0; from < to; from++) {
+            p.get()[i++] = from;
+        }
+    }
+
     void upper(T x=1){
         assert(M == N);
         for(int i = 0; i < M; i++) {
@@ -87,7 +110,7 @@ public:
 
     friend ostream& operator << (ostream&out, const Tensor<T>& t) {
         int _END = min(t.N, t.M);
-        _END = min(_END, 50);
+        _END = min(_END, 20);
         cout << "M=" << t.M << " " << "N=" << t.N << endl;
         T* data = t.p.get();
         assert(data != nullptr);
